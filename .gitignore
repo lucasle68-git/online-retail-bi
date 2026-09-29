@@ -1,0 +1,18 @@
+# Raw and generated data: download from UCI, never commit (see data/README.md)
+data/*.xlsx
+data/*.csv
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Power BI temp / backup files
+*.pbix.bak
+*_bak.pbix
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
