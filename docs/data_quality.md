@@ -114,6 +114,14 @@ Open points for the metric definitions page:
 
   Credit notes outweigh charges about 12 to 1 for `AMAZONFEE`, and `CRUK` has no positive lines at all. These lines behave like **costs the company paid** (marketplace fees, bank charges, charity commission) booked as credit notes, not like customers cancelling orders. *Interpretation, not documented in the source.*
   **Decision:** keep them in the clean table so every row is accounted for, but leave them out of sales KPIs. Revenue and cancellation-rate measures use `is_product = 1`. Fees are reported on their own line.
+- Cancellations split by line type:
+
+  | Line type | Cancellation lines | Cancelled value (£) |
+  |---|---:|---:|
+  | Non-product (`is_product = 0`) | 1,185 | −745,566 |
+  | Product (`is_product = 1`) | 17,915 | −716,463 |
+
+  Non-product lines are 6% of cancellation lines but 51% of cancelled value. Measured on all lines, cancellations look like about 7.1% of gross sales; on products only, about 3.6%. **Decision:** the cancellation-rate KPI uses product lines only, so it is not roughly doubled by fees and adjustments.
 
 ## 6. Out of scope
 
