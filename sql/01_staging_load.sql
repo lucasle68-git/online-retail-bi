@@ -5,7 +5,7 @@
              exactly as received, with lineage columns.
    Input   : C:\data\online_retail_2009_2010.csv
              C:\data\online_retail_2010_2011.csv   (from python/convert_to_csv.py)
-   Output  : RetailDW.stg.online_retail_raw  (all columns text + source_file, loaded_at)
+   Output  : RetailDW.stg.online_retail_raw  (stg_row_id + all columns as text + source_file, loaded_at)
    Re-run  : Safe to re-run (idempotent): drops and recreates the staging objects.
    Check   : Final query must return 525,461 and 541,910 rows.
    ===================================================================== */
@@ -22,6 +22,8 @@ GO
 
 -- 2. Every column is text: staging stores data exactly as received
 CREATE TABLE stg.online_retail_raw (
+    stg_row_id   BIGINT IDENTITY(1,1) NOT NULL
+                 CONSTRAINT PK_online_retail_raw PRIMARY KEY,   -- row-level lineage: every later table points back here
     Invoice      NVARCHAR(50)  NULL,
     StockCode    NVARCHAR(50)  NULL,
     Description  NVARCHAR(255) NULL,
@@ -36,6 +38,7 @@ CREATE TABLE stg.online_retail_raw (
 GO
 
 -- 3. A view exposing only the 8 columns in the CSV, used as the load target
+--    (stg_row_id is generated automatically; source_file and loaded_at are stamped after each load)
 CREATE VIEW stg.v_online_retail_load AS
 SELECT Invoice, StockCode, Description, Quantity, InvoiceDate, Price, CustomerID, Country
 FROM stg.online_retail_raw;
