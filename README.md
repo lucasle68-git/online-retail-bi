@@ -24,7 +24,7 @@ UCI Excel (2 sheets)
   → Clean + DQ    sql/03-05                       typed data, dq.issue_log, reconciliation
   → Star schema   sql/06-08                       dw.fact_sales + date, customer, product, country
   → Pipeline      sql/09-11                       etl.usp_run_all: one command, tests, etl.run_log
-  → Views         (step 7)                        rpt schema, the only source for Power BI
+  → Views         sql/12-13                       rpt schema, the only source for Power BI
   → Power BI      (steps 8–9)                     Power Query, DAX, 3 pages, row-level security
 ```
 
@@ -45,6 +45,7 @@ UCI Excel (2 sheets)
 4. Cleaning: run `sql/03`, `04`, then `05` (checks C1-C10).
 5. Star schema: run `sql/06`, `07`, then `08` (checks S1-S9). Design: `docs/star_schema.md`.
 6. Pipeline: run `sql/09`, `10`, then `11` (checks E1-E5). From then on, one command rebuilds everything: `EXEC etl.usp_run_all;`
+7. Reporting views: run `sql/12`, then `13` (checks V1-V8). Views hold no data, so they never need reloading.
 
 ## Limitations and next steps
 
