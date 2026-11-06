@@ -1,0 +1,574 @@
+createOrReplace
+
+	ref table '_Measures (2)'
+
+		/// Net product revenue (fees excluded). All data: £18,927,399
+		measure 'Net Revenue' = CALCULATE ( SUM ( Sales[Net Amount] ), Product[Is Product] = TRUE () )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Revenue
+			lineageTag: 5ab639d5-d1d8-4848-9897-ceb99eed7756
+
+		/// Every line incl. fees; reconciliation only. All data: £19,002,944
+		measure 'Net Amount (All Lines)' = SUM ( Sales[Net Amount] )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Revenue
+			lineageTag: 4c74fc8f-a712-4943-a9e9-cb3c69aa2b23
+
+		/// Product sales before cancellations
+		measure 'Gross Sales' = CALCULATE ( SUM ( Sales[Gross Sales Amount] ), Product[Is Product] = TRUE () )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Revenue
+			lineageTag: eed14d59-f626-48be-a8f5-0a19c77e5296
+
+		/// Value of cancelled product lines
+		measure 'Cancelled Value' = CALCULATE ( SUM ( Sales[Cancelled Amount] ), Product[Is Product] = TRUE () )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Revenue
+			lineageTag: 9cb1cc7b-a870-45e0-90a5-8a69bd542d09
+
+		/// Cancelled value / gross sales
+		measure 'Cancellation Rate' = DIVIDE ( [Cancelled Value], [Gross Sales] )
+			formatString: 0.0%;-0.0%;0.0%
+			displayFolder: 0 Core\Revenue
+			lineageTag: 7e376a1b-f8b0-433d-8449-ca0a0490523a
+
+		/// Distinct product invoices, cancellations excluded
+		measure 'Orders' =
+				CALCULATE (
+					DISTINCTCOUNT ( Sales[Invoice No] ),
+					Product[Is Product] = TRUE (),
+					Sales[Is Cancellation] = FALSE ()
+				)
+			formatString: #,0
+			displayFolder: 0 Core\Orders & Customers
+			lineageTag: d3bc13c6-1289-472f-8205-3861b7f009c7
+
+		/// Gross sales per order (pooled)
+		measure 'Average Order Value' = DIVIDE ( [Gross Sales], [Orders] )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Orders & Customers
+			lineageTag: 1cc89132-f4f6-4488-bf0e-544f55424a4d
+
+		/// Units on non-cancelled product lines
+		measure 'Units Sold' = CALCULATE ( SUM ( Sales[Quantity] ), Product[Is Product] = TRUE (), Sales[Is Cancellation] = FALSE () )
+			formatString: #,0
+			displayFolder: 0 Core\Orders & Customers
+			lineageTag: 677d0262-9358-425d-a61b-29546335e781
+
+		/// Known customers who bought. All data: 5,853
+		measure 'Active Customers' =
+				CALCULATE (
+					DISTINCTCOUNT ( Sales[customer_key] ),
+					Product[Is Product] = TRUE (),
+					Sales[Is Cancellation] = FALSE (),
+					Customer[Is Known Customer] = TRUE ()
+				)
+			formatString: #,0
+			displayFolder: 0 Core\Orders & Customers
+			lineageTag: 47a9f3a8-c0f7-4554-a610-fe22d8e1ac01
+
+		/// Customers with 2+ orders. All data: 4,234
+		measure 'Repeat Customers' =
+				VAR BuyingCustomers =
+					CALCULATETABLE (
+						VALUES ( Sales[customer_key] ),
+						Product[Is Product] = TRUE (),
+						Sales[Is Cancellation] = FALSE (),
+						Customer[Is Known Customer] = TRUE ()
+					)
+				RETURN
+					COUNTROWS ( FILTER ( BuyingCustomers, [Orders] >= 2 ) )
+			formatString: #,0
+			displayFolder: 0 Core\Orders & Customers
+			lineageTag: 814f5741-a82e-4457-817d-a531ff8d59d1
+
+		/// Repeat customers / active customers. All data: 72.3%
+		measure 'Repeat Customer Rate' = DIVIDE ( [Repeat Customers], [Active Customers] )
+			formatString: 0.0%;-0.0%;0.0%
+			displayFolder: 0 Core\Orders & Customers
+			lineageTag: fb2d701c-ac19-4c4b-b938-df8f2d0b1a40
+
+		/// Share of revenue with no customer ID. All data: 13.6%
+		measure 'Unknown Customer Revenue %' = DIVIDE ( CALCULATE ( [Net Revenue], Customer[Is Known Customer] = FALSE () ), [Net Revenue] )
+			formatString: 0.0%;-0.0%;0.0%
+			displayFolder: 0 Core\Orders & Customers
+			lineageTag: b2bf99f6-7fe5-4c2b-bbd1-a62f4c0ebdcb
+
+		/// TRUE when the prior year has data from its first day (guards every YoY)
+		measure 'Has Full Prior Year' =
+				VAR FirstSale    = CALCULATE ( MIN ( Sales[Invoice Time] ), REMOVEFILTERS () )
+				VAR FirstSaleDay = DATE ( YEAR ( FirstSale ), MONTH ( FirstSale ), DAY ( FirstSale ) )
+				VAR PriorStart   = EDATE ( MIN ( 'Date'[Date] ), -12 )
+				RETURN PriorStart >= FirstSaleDay
+			formatString: """TRUE"";""TRUE"";""FALSE"""
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 44c08bee-e521-401a-ba4e-36ae0834838d
+
+		/// Like-for-like prior year (stops at the last sale date)
+		measure 'Net Revenue PY' =
+				VAR LastSale      = CALCULATE ( MAX ( Sales[Invoice Time] ), REMOVEFILTERS () )
+				VAR DatesWithData = FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastSale )
+				RETURN CALCULATE ( [Net Revenue], SAMEPERIODLASTYEAR ( DatesWithData ) )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 15721148-9e10-4216-acfb-85b5c5cc4804
+
+		/// Like-for-like prior year
+		measure 'Orders PY' =
+				VAR LastSale      = CALCULATE ( MAX ( Sales[Invoice Time] ), REMOVEFILTERS () )
+				VAR DatesWithData = FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastSale )
+				RETURN CALCULATE ( [Orders], SAMEPERIODLASTYEAR ( DatesWithData ) )
+			formatString: #,0
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 344b8156-3a22-4477-85f6-859672118381
+
+		/// Like-for-like prior year
+		measure 'Average Order Value PY' =
+				VAR LastSale      = CALCULATE ( MAX ( Sales[Invoice Time] ), REMOVEFILTERS () )
+				VAR DatesWithData = FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastSale )
+				RETURN CALCULATE ( [Average Order Value], SAMEPERIODLASTYEAR ( DatesWithData ) )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: ce7954e4-be4e-4fac-b3c2-7d39fe6bb4e2
+
+		/// Like-for-like prior year
+		measure 'Cancellation Rate PY' =
+				VAR LastSale      = CALCULATE ( MAX ( Sales[Invoice Time] ), REMOVEFILTERS () )
+				VAR DatesWithData = FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastSale )
+				RETURN CALCULATE ( [Cancellation Rate], SAMEPERIODLASTYEAR ( DatesWithData ) )
+			formatString: 0.0%;-0.0%;0.0%
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 31354048-764b-4288-a604-0aa6fe27995b
+
+		/// Like-for-like prior year
+		measure 'Active Customers PY' =
+				VAR LastSale      = CALCULATE ( MAX ( Sales[Invoice Time] ), REMOVEFILTERS () )
+				VAR DatesWithData = FILTER ( VALUES ( 'Date'[Date] ), 'Date'[Date] <= LastSale )
+				RETURN CALCULATE ( [Active Customers], SAMEPERIODLASTYEAR ( DatesWithData ) )
+			formatString: #,0
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: f55c5e50-60d6-4ee8-a44e-e43fe07885d3
+
+		/// 2011: +2.7%
+		measure 'Net Revenue YoY %' = IF ( [Has Full Prior Year], DIVIDE ( [Net Revenue] - [Net Revenue PY], [Net Revenue PY] ) )
+			formatString: 0.0%;-0.0%;0.0%
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 49444af6-4c87-4d38-b55a-46e10d670daa
+
+		/// 2011: -4.9%
+		measure 'Orders YoY %' = IF ( [Has Full Prior Year], DIVIDE ( [Orders] - [Orders PY], [Orders PY] ) )
+			formatString: 0.0%;-0.0%;0.0%
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: ccfeb7dd-4072-4bcd-a5b9-c7c8d0601714
+
+		/// 2011: +10.5%
+		measure 'Average Order Value YoY %' = IF ( [Has Full Prior Year], DIVIDE ( [Average Order Value] - [Average Order Value PY], [Average Order Value PY] ) )
+			formatString: 0.0%;-0.0%;0.0%
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 37826c22-c8ac-4273-8ae2-75030f4cfa2e
+
+		/// 2011: +1.0%
+		measure 'Active Customers YoY %' = IF ( [Has Full Prior Year], DIVIDE ( [Active Customers] - [Active Customers PY], [Active Customers PY] ) )
+			formatString: 0.0%;-0.0%;0.0%
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 07139cbe-4ef5-4570-b7a2-c045ab753a74
+
+		/// Year to date
+		measure 'Net Revenue YTD' = TOTALYTD ( [Net Revenue], 'Date'[Date] )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 33f02b5b-1674-4345-8a37-565137ced8b8
+
+		/// Last 3 months up to the latest date in context
+		measure 'Net Revenue Rolling 3M' = CALCULATE ( [Net Revenue], DATESINPERIOD ( 'Date'[Date], MAX ( 'Date'[Date] ), -3, MONTH ) )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 0 Core\Time intelligence
+			lineageTag: 1984bc19-d8f0-4327-a43a-371a904b928f
+
+		/// Card value as text so it is not shortened to 19K
+		measure 'Orders Display' = FORMAT ( [Orders], "#,0" )
+			displayFolder: 1 Overview\KPI cards
+			lineageTag: 07a1b690-edfd-4553-8366-371cd5f1d85f
+
+		/// Card value as text: £501
+		measure 'Average Order Value Display' = FORMAT ( [Average Order Value], "£#,0" )
+			displayFolder: 1 Overview\KPI cards
+
+		/// Card value as text (also used on page 3)
+		measure 'Active Customers Display' = FORMAT ( [Active Customers], "#,0" )
+			displayFolder: 1 Overview\KPI cards
+			lineageTag: ff37ca5b-5ec3-4413-847b-a8a9dc55e10e
+
+		/// Card value as text
+		measure 'Cancellation Rate Display' = FORMAT ( [Cancellation Rate], "0.0%" )
+			displayFolder: 1 Overview\KPI cards
+			lineageTag: d6e25fe8-93e5-4584-b42d-07b7a50d9a95
+
+		/// 2011: ▲ 2.7% vs 2010 (£8.78m)
+		measure 'KPI Revenue Note' =
+				VAR PrevYear = SELECTEDVALUE ( 'Date'[Year] ) - 1
+				VAR Change   = [Net Revenue YoY %]
+				RETURN
+					IF (
+						[Has Full Prior Year],
+						IF ( Change >= 0, "▲ ", "▼ " ) & FORMAT ( ABS ( Change ), "0.0%" )
+							& " vs " & PrevYear & " (£" & FORMAT ( [Net Revenue PY] / 1000000, "0.00" ) & "m)",
+						"No full prior year to compare"
+					)
+			displayFolder: 1 Overview\KPI cards
+			lineageTag: d800d1ec-d017-4462-81e0-0f2bf84521a1
+
+		/// 2011: ▼ 4.9% vs 2010 (19,885)
+		measure 'KPI Orders Note' =
+				VAR PrevYear = SELECTEDVALUE ( 'Date'[Year] ) - 1
+				VAR Change   = [Orders YoY %]
+				RETURN
+					IF (
+						[Has Full Prior Year],
+						IF ( Change >= 0, "▲ ", "▼ " ) & FORMAT ( ABS ( Change ), "0.0%" )
+							& " vs " & PrevYear & " (" & FORMAT ( [Orders PY], "#,0" ) & ")",
+						"No full prior year to compare"
+					)
+			displayFolder: 1 Overview\KPI cards
+			lineageTag: ac1880f2-7a98-4058-974e-b32268042add
+
+		/// 2011: ▲ 10.5% vs 2010 (£453)
+		measure 'KPI AOV Note' =
+				VAR PrevYear = SELECTEDVALUE ( 'Date'[Year] ) - 1
+				VAR Change   = [Average Order Value YoY %]
+				RETURN
+					IF (
+						[Has Full Prior Year],
+						IF ( Change >= 0, "▲ ", "▼ " ) & FORMAT ( ABS ( Change ), "0.0%" )
+							& " vs " & PrevYear & " (£" & FORMAT ( [Average Order Value PY], "#,0" ) & ")",
+						"No full prior year to compare"
+					)
+			displayFolder: 1 Overview\KPI cards
+			lineageTag: 4038d72f-4846-471e-b564-b73071549293
+
+		/// 2011: ▲ 1.0% vs 2010 · 64% ordered again
+		measure 'KPI Customers Note' =
+				VAR PrevYear   = SELECTEDVALUE ( 'Date'[Year] ) - 1
+				VAR Change     = [Active Customers YoY %]
+				VAR RepeatText = FORMAT ( [Repeat Customer Rate], "0%" ) & " ordered again"
+				RETURN
+					IF (
+						[Has Full Prior Year],
+						IF ( Change >= 0, "▲ ", "▼ " ) & FORMAT ( ABS ( Change ), "0.0%" )
+							& " vs " & PrevYear & " · " & RepeatText,
+						RepeatText
+					)
+			displayFolder: 1 Overview\KPI cards
+			lineageTag: 92308ba2-94c9-4e49-81fc-cc455fdaa93b
+
+		/// 2011: Up from 2.5% in 2010
+		measure 'KPI Cancellation Note' =
+				VAR PrevYear = SELECTEDVALUE ( 'Date'[Year] ) - 1
+				VAR PrevRate = [Cancellation Rate PY]
+				RETURN
+					IF (
+						[Has Full Prior Year],
+						IF ( [Cancellation Rate] >= PrevRate, "Up from ", "Down from " )
+							& FORMAT ( PrevRate, "0.0%" ) & " in " & PrevYear,
+						"No full prior year to compare"
+					)
+			displayFolder: 1 Overview\KPI cards
+			lineageTag: e01116e8-4226-4b12-a530-12ca28bc99b9
+
+		/// Green up, orange down, grey with no prior year
+		measure 'KPI Colour Revenue' = IF ( NOT [Has Full Prior Year], "#5B6472", IF ( [Net Revenue YoY %] < 0, "#B4400B", "#0F7A4A" ) )
+			displayFolder: 1 Overview\KPI colours
+			lineageTag: bc64afd1-e7ea-4539-b12b-69f21b565ae1
+
+		/// Overview Orders card: orange when orders fall
+		measure 'KPI Colour Orders' = IF ( NOT [Has Full Prior Year], "#5B6472", IF ( [Orders YoY %] < 0, "#B4400B", "#0F7A4A" ) )
+			displayFolder: 1 Overview\KPI colours
+			lineageTag: 10d84e0c-9a37-4d17-8b14-c28c62443bf9
+
+		/// Overview AOV card: green when the average order grows
+		measure 'KPI Colour AOV' = IF ( NOT [Has Full Prior Year], "#5B6472", IF ( [Average Order Value YoY %] < 0, "#B4400B", "#0F7A4A" ) )
+			displayFolder: 1 Overview\KPI colours
+			lineageTag: f497d17d-afd4-477e-bcec-b8be5cce4685
+
+		/// Overview Customers card: green when customers grow
+		measure 'KPI Colour Customers' = IF ( NOT [Has Full Prior Year], "#5B6472", IF ( [Active Customers YoY %] < 0, "#B4400B", "#0F7A4A" ) )
+			displayFolder: 1 Overview\KPI colours
+			lineageTag: 8bde5996-f016-4bd5-b1b0-6a696f1bb81c
+
+		/// Orange when the cancellation rate goes UP
+		measure 'KPI Colour Cancellation' = IF ( NOT [Has Full Prior Year], "#5B6472", IF ( [Cancellation Rate] > [Cancellation Rate PY], "#B4400B", "#0F7A4A" ) )
+			displayFolder: 1 Overview\KPI colours
+			lineageTag: 52be6514-e6fe-4c3b-9a0e-0432ccd364a5
+
+		/// Market share of revenue. 2011: UK 84.2%, International 15.7%
+		measure 'Revenue Share %' = DIVIDE ( [Net Revenue], CALCULATE ( [Net Revenue], REMOVEFILTERS ( Country ) ) )
+			formatString: 0.0%
+			displayFolder: 1 Overview\Market split
+			lineageTag: 460d7542-c89f-44d4-b3cb-8b91e0643167
+
+		/// Countries outside the UK with sales (also used on page 2)
+		measure 'Countries Abroad' = CALCULATE ( DISTINCTCOUNT ( Country[Country] ), Country[Market] = "International", Sales )
+			formatString: #,0
+			displayFolder: 1 Overview\Market split
+			lineageTag: 3d8def82-15b6-4187-9c73-323f201d760e
+
+		/// Subtitle of Where revenue comes from
+		measure 'Market Subtitle' = SELECTEDVALUE ( 'Date'[Year] ) & " · " & [Countries Abroad] & " countries outside the UK"
+			displayFolder: 1 Overview\Market split
+			lineageTag: a6248394-c723-4069-9e11-ecda04c2034a
+
+		/// All data: £2.75m
+		measure 'International Revenue' = CALCULATE ( [Net Revenue], Country[Market] = "International" )
+			formatString: "£"#,0.00;-"£"#,0.00;"£"#,0.00
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// All data: 14.5%
+		measure 'International Share %' = DIVIDE ( [International Revenue], CALCULATE ( [Net Revenue], REMOVEFILTERS ( Country ) ) )
+			formatString: 0.0%
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// £2.75m from 41 countries
+		measure 'KPI International Note' = "£" & FORMAT ( [International Revenue] / 1000000, "0.00" ) & "m from " & [Countries Abroad] & " countries"
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// Ireland
+		measure 'Top Market Abroad' =
+				VAR TopRow =
+					TOPN ( 1, CALCULATETABLE ( VALUES ( Country[Country] ), Country[Market] = "International" ), [Net Revenue], DESC )
+				VAR TopName = MAXX ( TopRow, Country[Country] )
+				RETURN IF ( TopName = "EIRE", "Ireland", TopName )
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// £603k · 22% of revenue outside the UK
+		measure 'KPI Top Market Note' =
+				VAR TopRow =
+					TOPN ( 1, CALCULATETABLE ( VALUES ( Country[Country] ), Country[Market] = "International" ), [Net Revenue], DESC )
+				VAR TopRevenue = SUMX ( TopRow, [Net Revenue] )
+				RETURN
+					"£" & FORMAT ( TopRevenue / 1000, "#,0" ) & "k · "
+						& FORMAT ( DIVIDE ( TopRevenue, [International Revenue] ), "0%" ) & " of revenue outside the UK"
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// Stock codes with sales, fees excluded. All data: 4,802
+		measure 'Products Sold' = CALCULATE ( COUNTROWS ( 'Product' ), KEEPFILTERS ( Product[ABC Class] IN { "A", "B", "C" } ), Sales )
+			formatString: #,0
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// Card value as text
+		measure 'Products Sold Display' = FORMAT ( [Products Sold], "#,0" )
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// Page 2 Products card note
+		measure 'KPI Products Note' = "Stock codes with sales, fees excluded"
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// Best sellers. All data: 1,038
+		measure 'Class A Products' = CALCULATE ( [Products Sold], Product[ABC Class] = "A" )
+			formatString: #,0
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// Card value as text
+		measure 'Class A Products Display' = FORMAT ( [Class A Products], "#,0" )
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// 22% of products, 80% of revenue
+		measure 'KPI Class A Note' =
+				FORMAT ( DIVIDE ( [Class A Products], [Products Sold] ), "0%" ) & " of products, "
+					& FORMAT ( DIVIDE ( CALCULATE ( [Net Revenue], Product[ABC Class] = "A" ), [Net Revenue] ), "0%" )
+					& " of revenue"
+			displayFolder: 2 Markets & Products\KPI cards
+
+		/// ABC pair, Products bar: A 22% · B 26% · C 52%
+		measure 'Product Count Share %' = DIVIDE ( [Products Sold], CALCULATE ( [Products Sold], REMOVEFILTERS ( Product[ABC Class] ) ) )
+			formatString: 0%
+			displayFolder: 2 Markets & Products\Charts
+
+		/// ABC pair, Revenue bar: A 80% · B 15% · C 5%
+		measure 'Revenue Share by Class %' = DIVIDE ( [Net Revenue], CALCULATE ( [Net Revenue], REMOVEFILTERS ( Product[ABC Class] ) ) )
+			formatString: 0%
+			displayFolder: 2 Markets & Products\Charts
+
+		/// Top 10 countries chart: top 3 blue, rest grey
+		measure 'Country Bar Colour' = IF ( RANKX ( ALLSELECTED ( Country ), [Net Revenue] ) <= 3, "#1F5FAD", "#C9CED6" )
+			displayFolder: 2 Markets & Products\Charts
+
+		/// Cancelled products table: orange when over 90% cancelled
+		measure 'Cancel Row Colour' = IF ( [Cancellation Rate] > 0.9, "#B4400B", "#1F2937" )
+			displayFolder: 2 Markets & Products\Charts
+
+		/// All data: 54.1%
+		measure 'Wholesale Revenue Share %' = CALCULATE ( [Revenue Share by Segment %], Customer[Segment] = "Wholesale" )
+			formatString: 0.0%
+			displayFolder: 3 Customers\KPI cards
+
+		/// They are 16.2% of customers
+		measure 'KPI Wholesale Note' = "They are " & FORMAT ( CALCULATE ( [Customer Share %], Customer[Segment] = "Wholesale" ), "0.0%" ) & " of customers"
+			displayFolder: 3 Customers\KPI cards
+
+		/// 4,234 customers with 2+ orders
+		measure 'KPI Repeat Note' = FORMAT ( [Repeat Customers], "#,0" ) & " customers with 2+ orders"
+			displayFolder: 3 Customers\KPI cards
+
+		/// Page 3 Customers card note
+		measure 'KPI Known Customers Note' = "Customers we can identify"
+			displayFolder: 3 Customers\KPI cards
+
+		/// Lapsed, frequent, high-value customers. All data: 327
+		measure 'Win-back Customers' = CALCULATE ( [Active Customers], Customer[Is Win-back Target] = 1 )
+			formatString: #,0
+			displayFolder: 3 Customers\KPI cards
+
+		/// Page 3 Win-back card note
+		measure 'KPI Win-back Note' = "Bought often, spent a lot, then went quiet"
+			displayFolder: 3 Customers\KPI cards
+
+		/// Wholesale 16.2% · Retail 83.8%
+		measure 'Customer Share %' = DIVIDE ( [Active Customers], CALCULATE ( [Active Customers], Customer[Segment] IN { "Wholesale", "Retail" } ) )
+			formatString: 0.0%
+			displayFolder: 3 Customers\Charts
+
+		/// Wholesale 54.1% · Retail 45.9%
+		measure 'Revenue Share by Segment %' = DIVIDE ( [Net Revenue], CALCULATE ( [Net Revenue], Customer[Segment] IN { "Wholesale", "Retail" } ) )
+			formatString: 0.0%
+			displayFolder: 3 Customers\Charts
+
+		/// Average of each customer's own average order: Wholesale £1,072 · Retail £251
+		measure 'Avg Customer Order Value' =
+				AVERAGEX (
+					CALCULATETABLE (
+						VALUES ( Sales[customer_key] ),
+						Product[Is Product] = TRUE (),
+						Sales[Is Cancellation] = FALSE (),
+						Customer[Is Known Customer] = TRUE ()
+					),
+					[Average Order Value]
+				)
+			formatString: "£"#,0;-"£"#,0;"£"#,0
+			displayFolder: 3 Customers\Charts
+
+		/// Wholesale 9.4 · Retail 5.6
+		measure 'Orders per Customer' = DIVIDE ( [Orders], [Active Customers] )
+			formatString: 0.0
+			displayFolder: 3 Customers\Charts
+
+		/// RFM bar charts: Champions blue, At risk orange, others grey
+		measure 'RFM Bar Colour' = SWITCH ( SELECTEDVALUE ( Customer[RFM Segment] ), "Champions", "#1F5FAD", "At risk", "#C2410C", "#B6C2D3" )
+			displayFolder: 3 Customers\Charts
+
+		/// Text colour for an RFM table (kept as an option; the page uses RFM Bar Colour)
+		measure 'RFM Row Colour' = SWITCH ( SELECTEDVALUE ( Customer[RFM Segment] ), "At risk", "#B4400B", "Champions", "#1F5FAD", "#1F2937" )
+			displayFolder: 3 Customers\Charts
+
+		/// Rows read from the two source files: 1,067,371
+		measure 'Rows Received' = CALCULATE ( SUM ( 'Data Quality'[Rows] ), 'Data Quality'[Step Order] = 0 )
+			formatString: #,0
+			displayFolder: 4 Data Quality\Pipeline
+			lineageTag: a31c970f-b4a9-4952-b00e-cb8de7891f42
+
+		/// Rows in the Sales fact table: 1,029,620
+		measure 'Rows In Model' = CALCULATE ( SUM ( 'Data Quality'[Rows] ), 'Data Quality'[Step Order] = 10 )
+			formatString: #,0
+			displayFolder: 4 Data Quality\Pipeline
+			lineageTag: 4b0665a4-559b-4124-9ccd-ce4e6870b518
+
+		/// Received minus rows in the model: 37,751
+		measure 'Rows Excluded' = [Rows Received] - [Rows In Model]
+			formatString: #,0
+			displayFolder: 4 Data Quality\Pipeline
+			lineageTag: eea5cf3c-3002-4b41-86f6-1ceb9f75dc69
+
+		/// Header label on every page
+		measure 'Last Refreshed Label' = "Data refreshed " & FORMAT ( MAX ( 'Pipeline Status'[Last Refreshed] ), "d mmm yyyy, hh:nn" )
+			displayFolder: 4 Data Quality\Pipeline
+			lineageTag: 4ca1260a-75a4-4f7e-afb1-380e98fa6f73
+
+		/// Rows excluded by a named rule (R0-R5). Expect 37,751
+		measure 'Removed With Reason' = - CALCULATE ( SUM ( 'Data Quality'[Rows] ), NOT ISBLANK ( 'Data Quality'[Rule] ) )
+			formatString: #,0
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// Rows not explained by a rule + pounds that differ from the database. Expect 0
+		measure 'Rows or Pounds Lost' =
+				VAR RowsLost   = [Rows Received] - [Removed With Reason] - COUNTROWS ( Sales )
+				VAR PoundsLost = ROUND ( ABS ( MAX ( 'Pipeline Status'[Net Amount In Model] ) - [Net Amount (All Lines)] ), 2 )
+				RETURN ABS ( RowsLost ) + PoundsLost
+			formatString: #,0
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// Card value as text: 1,067,371
+		measure 'Rows Received Display' = FORMAT ( [Rows Received], "#,0" )
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// Card value as text: 37,751
+		measure 'Rows Excluded Display' = FORMAT ( [Removed With Reason], "#,0" )
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// Card value as text: 0
+		measure 'Rows or Pounds Lost Display' = FORMAT ( [Rows or Pounds Lost], "#,0" )
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// Seconds taken by the last successful pipeline run
+		measure 'Refresh Duration Display' = FORMAT ( MAX ( 'Pipeline Status'[Duration Seconds] ), "0" ) & " s"
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// Page 4 Rows received card note
+		measure 'KPI Received Note' = "From two source files"
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// 3.5% of rows · 91% were duplicate copies
+		measure 'KPI Excluded Note' =
+				VAR Duplicates = - CALCULATE ( SUM ( 'Data Quality'[Rows] ), 'Data Quality'[Rule] IN { "R1", "R2" } )
+				RETURN
+					FORMAT ( DIVIDE ( [Removed With Reason], [Rows Received] ), "0.0%" ) & " of rows · "
+						& FORMAT ( DIVIDE ( Duplicates, [Removed With Reason] ), "0%" ) & " were duplicate copies"
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// Page 4 Rows or pounds lost card note
+		measure 'KPI Lost Note' = "Checked at every step, every run"
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// The pipeline view only keeps succeeded runs
+		measure 'KPI Refresh Note' = "One command · run " & MAX ( 'Pipeline Status'[Run ID] ) & " succeeded"
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// Green when nothing is lost, orange otherwise
+		measure 'KPI Lost Colour' = IF ( [Rows or Pounds Lost] = 0, "#0F7A4A", "#B4400B" )
+			displayFolder: 4 Data Quality\KPI cards
+
+		/// The number as Power BI calculates it
+		measure 'Recon Report Value' =
+				SWITCH (
+					SELECTEDVALUE ( Reconciliation[Order] ),
+					1, [Net Revenue],
+					2, [Net Amount (All Lines)],
+					3, [Active Customers],
+					4, [Repeat Customers],
+					5, COUNTROWS ( Sales )
+				)
+			displayFolder: 4 Data Quality\Reconciliation
+
+		/// Rows 2 and 5 come live from etl.run_log; rows 1, 3, 4 from the SQL checks
+		measure 'Recon Database Value' =
+				SWITCH (
+					SELECTEDVALUE ( Reconciliation[Order] ),
+					2, MAX ( 'Pipeline Status'[Net Amount In Model] ),
+					5, MAX ( 'Pipeline Status'[Rows In Model] ),
+					SELECTEDVALUE ( Reconciliation[Database Value] )
+				)
+			displayFolder: 4 Data Quality\Reconciliation
+
+		/// Report value formatted: £ for money rows, #,0 for counts
+		measure 'Recon Report Display' = IF ( SELECTEDVALUE ( Reconciliation[Order] ) <= 2, FORMAT ( [Recon Report Value], "£#,0.00" ), FORMAT ( [Recon Report Value], "#,0" ) )
+			displayFolder: 4 Data Quality\Reconciliation
+
+		/// Database value formatted the same way
+		measure 'Recon Database Display' = IF ( SELECTEDVALUE ( Reconciliation[Order] ) <= 2, FORMAT ( [Recon Database Value], "£#,0.00" ), FORMAT ( [Recon Database Value], "#,0" ) )
+			displayFolder: 4 Data Quality\Reconciliation
+
+		/// Same when report and database differ by less than 1p
+		measure 'Recon Status' = IF ( ABS ( [Recon Report Value] - [Recon Database Value] ) < 0.01, "Same", "Different" )
+			displayFolder: 4 Data Quality\Reconciliation
+
+		/// Green for Same, orange for Different
+		measure 'Recon Status Colour' = IF ( [Recon Status] = "Same", "#0F7A4A", "#B4400B" )
+			displayFolder: 4 Data Quality\Reconciliation

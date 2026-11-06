@@ -1,0 +1,15 @@
+// Modeling → New table. Database values for rows 1, 3, 4 come from the SQL checks (V3, V6);
+// rows 2 and 5 are read live from etl.run_log by [Recon Database Value].
+Reconciliation =
+DATATABLE (
+    "Order", INTEGER,
+    "Check", STRING,
+    "Database Value", DOUBLE,
+    {
+        { 1, "Product revenue", 18927399.07 },
+        { 2, "All sales lines", 19002944.28 },
+        { 3, "Customers who bought", 5853 },
+        { 4, "Came back to buy again", 4234 },
+        { 5, "Rows used", 1029620 }
+    }
+)
