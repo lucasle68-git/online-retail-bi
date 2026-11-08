@@ -1,4 +1,10 @@
-# Power BI measures
+# Power BI
+
+- [`online_retail_bi.pbix`](online_retail_bi.pbix): the report (4 pages, import mode, data as of the last pipeline run)
+- [`online_retail_bi.pdf`](online_retail_bi.pdf): the same report as a PDF
+- [`theme.json`](theme.json): colours and fonts
+
+## Measures
 
 All DAX measures live in one file, [`tmdl/all_measures.tmdl`](tmdl/all_measures.tmdl).
 To deploy: Power BI Desktop → TMDL view → new tab → paste the whole file → Preview → Apply.

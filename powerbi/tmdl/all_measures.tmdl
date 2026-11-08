@@ -388,8 +388,12 @@ createOrReplace
 			formatString: 0%
 			displayFolder: 2 Markets & Products\Charts
 
-		/// Top 10 countries chart: top 3 blue, rest grey
-		measure 'Country Bar Colour' = IF ( RANKX ( ALLSELECTED ( Country ), [Net Revenue] ) <= 3, "#1F5FAD", "#C9CED6" )
+		/// Top 10 countries chart: the 3 biggest countries outside the UK blue, rest grey.
+		/// ALL ( Country ) so the visual's own Top 10 filter cannot shift the ranking; Year and Segment slicers still apply.
+		measure 'Country Bar Colour' =
+				VAR Top3 = TOPN ( 3, FILTER ( ALL ( Country ), Country[Market] = "International" ), [Net Revenue], DESC )
+				VAR ThisCountry = SELECTEDVALUE ( Country[Country Display] )
+				RETURN IF ( ThisCountry IN SELECTCOLUMNS ( Top3, "Name", Country[Country Display] ), "#1F5FAD", "#C9CED6" )
 			displayFolder: 2 Markets & Products\Charts
 
 		/// Cancelled products table: orange when over 90% cancelled

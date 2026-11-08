@@ -1,4 +1,4 @@
-# Findings so far
+# Findings
 
 Numbers from the SQL checks (`sql/05`, `08`, `13`). Product lines only unless stated. Data period: 1 Dec 2009 to 9 Dec 2011.
 
@@ -19,7 +19,7 @@ Numbers from the SQL checks (`sql/05`, `08`, `13`). Product lines only unless st
 ## Markets (all data)
 
 - The UK brings 85.4% of product revenue; 41 other countries bring 14.5% (15.7% in 2011).
-- Ireland (22%), the Netherlands (20%) and Germany (14%) make 55% of revenue outside the UK.
+- Ireland (22%), the Netherlands (20%) and Germany (14%) make 55.4% of revenue outside the UK.
 
 ## Customers (5,853 known customers with at least one product order)
 
