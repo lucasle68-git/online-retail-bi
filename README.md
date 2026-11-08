@@ -1,4 +1,4 @@
-# Online Retail BI: from 1 million raw rows to a Power BI report you can trust
+# Online Retail BI: from 1 million raw rows to a Power BI report
 
 An end-to-end BI project on 1.07 million real transactions from a UK online retailer (Dec 2009 – Dec 2011):
 raw Excel files → SQL Server (staging, cleaning, star schema, one-command pipeline) → a 4-page Power BI report that answers five business questions and reconciles to the database to the penny.
